@@ -1,0 +1,89 @@
+
+Batch size test
+B1   = 6.584 s/iter
+B32  = 4.080 s/iter
+B64  = 4.034 s/iter
+B128 = 4.019 s/iter
+--------------------
+Pin memory test
+B1P  = 7.723 s/iter
+B32P = 4.127 s/iter
+B64P = 4.664 s/iter
+B128P = 4.612 s/iter
+--------------------
+Worker number test (B=1)
+B1W0  = 6.558 s/iter
+B1W1  = 24.509 s/iter
+B1W2  = 14.052 s/iter
+B1W4  = 12.752 s/iter
+B1W8  = 13.742 s/iter
+B1W16 = 16.130 s/iter
+--------------------
+Worker number test (B=64)
+B64W0  = 4.409 s/iter
+B64W1  = 6.511 s/iter
+B64W2  = 4.175 s/iter
+B64W4  = 3.480 s/iter
+B64W8  = 3.514 s/iter
+B64W16 = 4.589 s/iter
+--------------------
+Model prediction on CPU tests:
+
+Batch size test
+B1   = 27.260 s/iter
+B32  = 9.787 s/iter
+B64  = 9.729 s/iter
+B128 = 9.617 s/iter
+--------------------
+Pin memory test
+B1P    = 26.359 s/iter
+B32P   = 8.128 s/iter
+B64P   = 8.567 s/iter
+B128P  = 8.763 s/iter
+--------------------
+Worker number test (B=1)
+B1W0  = 24.448 s/iter
+B1W1  = 29.615 s/iter
+B1W2  = 30.010 s/iter
+B1W4  = 32.044 s/iter
+B1W8  = 31.957 s/iter
+B1W16 = 35.008 s/iter
+--------------------
+Worker number test (B=64)
+B64W0  = 8.481 s/iter
+B64W1  = 6.964 s/iter
+B64W2  = 5.427 s/iter
+B64W4  = 5.622 s/iter
+B64W8  = 6.310 s/iter
+B64W16 = 8.062 s/iter
+--------------------
+Model prediction on GPU tests:
+
+Batch size test
+B1   = 42.092 s/iter
+B32  = 5.957 s/iter
+B64  = 6.012 s/iter
+B128 = 5.387 s/iter
+--------------------
+Pin memory test
+B1P    = 43.019 s/iter
+B32P   = 6.128 s/iter
+B64P   = 6.706 s/iter
+B128P  = 6.095 s/iter
+--------------------
+Worker number test (B=1)
+B1W0  = 41.182 s/iter
+B1W1  = 48.624 s/iter
+B1W2  = 48.826 s/iter
+B1W4  = 49.051 s/iter
+B1W8  = 50.449 s/iter
+B1W16 = 51.669 s/iter
+--------------------
+Worker number test (B=64)
+B64W0  = 6.168 s/iter
+B64W1  = 6.216 s/iter
+B64W2  = 3.906 s/iter
+B64W4  = 2.984 s/iter
+B64W8  = 3.428 s/iter
+B64W16 = 4.756 s/iter
+--------------------
