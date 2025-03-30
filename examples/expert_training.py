@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 from tqdm import tqdm
 from torch.optim import Optimizer
+from contextlib import nullcontext
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.nn.modules.loss import _Loss
 from torch.utils.data import Dataset, DataLoader
@@ -14,9 +15,6 @@ from utils.early_stoppage import EarlyStopping
 """
 Add
 - MLflow logging - Claude + docs
-- mixed precision - see karpathy
-- grad accumulation - see karpathy
-- grad clipping - see karpathy
 - torch.profiler - Claude
 """
 
@@ -25,10 +23,18 @@ class Parameters():
     # Training 
     n_epochs = 50
     batch_size = 64
+    n_grad_accumulations = 16
     stopping_criterion = EarlyStopping(patience=5, mode="min") 
 
     # Hardware
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    device_name = 'cuda' if torch.cuda.is_available() else 'cpu'
+    device = torch.device(device_name)
+
+    # AMP
+    dtype = torch.bfloat16 if (torch.cuda.is_available() and torch.cuda.is_bf16_supported()) else torch.float16 # bfloat16'|'float16'
+    ctx = nullcontext() if (device_name == 'cpu') else torch.autocast(device_type=device_name, dtype=dtype)
+    gradient_clipping = 0.0
+    scaler = torch.GradScaler(enabled=(dtype == torch.float16))
 
 
 class LinearDataset(Dataset):
@@ -92,9 +98,8 @@ def train(
     overfit: bool = False 
     ):
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     train_pbar = tqdm(range(p.n_epochs), desc=f'Training', position=0)
-    print(f"Started training on device: {p.device}")
+    print(f"Started training on device: {p.device} | dtype: {p.dtype}")
     torch.set_float32_matmul_precision("high")
     
     for epoch in train_pbar:
@@ -106,17 +111,29 @@ def train(
             if overfit and (batch_idx > 0): break # when True, overfit single batch
 
             # Transfer data to GPU
-            x, y = x.to(device), y.to(device)
+            x, y = x.to(p.device), y.to(p.device)
 
-            # Forward pass
-            outputs = model(x)
-            loss = loss_fn(outputs, y)
-            
-            # Backward and optimize
-            optimizer.zero_grad()
-            loss.backward()
+            # Automatic Mixed Precision (AMP)
+            with p.ctx:
+                outputs = model(x)
+                loss = loss_fn(outputs, y)
+
+            loss /= p.n_grad_accumulations
             train_loss += loss.item()
-            optimizer.step()
+            p.scaler.scale(loss).backward()
+
+            if ((batch_idx+1) % p.n_grad_accumulations == 0) or overfit:
+
+                # Gradient clipping
+                if p.gradient_clipping != 0.0:
+                    p.scaler.unscale_(optimizer)
+                    norm = torch.nn.utils.clip_grad_norm_(model.parameters(), p.gradient_clipping)
+
+                # Optimizer step
+                p.scaler.step(optimizer)
+                p.scaler.update()
+                optimizer.zero_grad()
+
         train_loss = train_loss/len(train_loader)
         
         # Validation
@@ -126,7 +143,7 @@ def train(
         scheduler.step(val_loss)
 
         # Update tqdm description
-        train_pbar.set_description_str(f"[Training] L_tr={train_loss:.4f}|L_val={val_loss:.4f}")
+        train_pbar.set_description_str(f"[Training] L_tr={train_loss:.4f}|L_val={val_loss:.4f}"+(f"| norm: {norm:.3f}" if p.gradient_clipping!=0 else ""))
 
         # Check early stoppage
         if p.stopping_criterion(model, val_loss):
@@ -166,7 +183,7 @@ def test(
 
 if __name__ == "__main__":
 
-    compile_model = False
+    compile_model = True
     save_model = False
 
     p = Parameters()
@@ -186,7 +203,7 @@ if __name__ == "__main__":
     if compile_model:
         import torch._dynamo
         torch._dynamo.config.suppress_errors = True
-        model = torch.compile(model)
+        model = torch.compile(model, mode="default")
 
     # Loss & Optimizer & Scheduler
     loss_fn = nn.MSELoss()
