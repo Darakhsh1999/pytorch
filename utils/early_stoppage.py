@@ -15,7 +15,10 @@ class EarlyStopping():
         self.counter = 0
 
     def load_best_model(self, model):
-        model.load_state_dict(self.best_model.state_dict())
+        if self.best_model is None:
+            raise ValueError("Tried to load mode but best_model is None")
+        else:
+            model.load_state_dict(self.best_model.state_dict())
         return
 
     def reset(self):
@@ -33,7 +36,7 @@ class EarlyStopping():
             self.best_score = score
             self.counter = 0
             self.best_model.load_state_dict(model.state_dict()) # Store new best model
-        else: # Decrease
+        else: # Increment counter and check termination
             self.counter += 1
             if (self.patience is not None) and (self.counter >= self.patience):
                 if self.restore_best_weights:
