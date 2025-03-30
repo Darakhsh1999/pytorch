@@ -3,6 +3,15 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
 
+class Parameters():
+
+    # Training 
+    n_epochs = 100
+    batch_size = 64
+
+    # Hardware
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
 # Custom dataset for y = 3x + 2 with Gaussian noise
 class LinearDataset(Dataset):
     def __init__(self, num_samples=1000, noise_std=0.5):
@@ -40,78 +49,74 @@ class MLP(nn.Module):
         return self.model(x)
 
 # Training function
-def train(model, train_loader, criterion, optimizer, device, epochs=100):
+def train(model, p, train_loader, val_loader, loss_fn, optimizer):
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.train()
-    losses = []
     
-    for epoch in range(epochs):
-        epoch_loss = 0
+    for epoch in range(p.n_epochs):
         for x, y in train_loader:
             x, y = x.to(device), y.to(device)
             
             # Forward pass
             outputs = model(x)
-            loss = criterion(outputs, y)
+            loss = loss_fn(outputs, y)
             
             # Backward and optimize
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
+        
+        val_loss = test(model, val_loader, loss_fn)
             
-            epoch_loss += loss.item()
+    return
         
-        avg_loss = epoch_loss / len(train_loader)
-        losses.append(avg_loss)
-        
-        if (epoch + 1) % 10 == 0:
-            print(f'Epoch [{epoch+1}/{epochs}], Loss: {avg_loss:.4f}')
-    
-    return losses
 
 # Evaluation function
-def evaluate(model, test_loader, criterion, device):
+def test(model, data_loader, loss_fn):
+    device = model.device
     model.eval()
     total_loss = 0
     
     with torch.no_grad():
-        for x, y in test_loader:
+        for x, y in data_loader:
             x, y = x.to(device), y.to(device)
             outputs = model(x)
-            loss = criterion(outputs, y)
+            loss = loss_fn(outputs, y)
             total_loss += loss.item()
     
     avg_loss = total_loss / len(test_loader)
-    print(f'Test Loss: {avg_loss:.4f}')
+    print(f'Loss: {avg_loss:.4f}')
     return avg_loss
 
 if __name__ == "__main__":
+
+    p = Parameters()
+
     # Device configuration
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     
     # Create dataset
     dataset = LinearDataset(num_samples=1000, noise_std=0.5)
-    
-    # Split dataset manually
-    train_ratio = 0.8
-    train_size = int(train_ratio * len(dataset))
-    test_size = len(dataset) - train_size
-    train_dataset, test_dataset = torch.utils.data.random_split(dataset, [train_size, test_size])
+    train_data, val_data, test_data = torch.utils.data.random_split(dataset, [0.8, 0.1, 0.1])
     
     # Create dataloaders
-    batch_size = 64
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+    train_loader = DataLoader(train_data, batch_size=p.batch_size, shuffle=True)
+    val_loader = DataLoader(val_data, batch_size=p.batch_size, shuffle=False)
+    test_loader = DataLoader(test_data, batch_size=p.batch_size, shuffle=False)
     
-    # Create model, loss function, and optimizer
-    model = MLP(input_dim=1, hidden_dims=[32, 16], output_dim=1).to(device)
-    criterion = nn.MSELoss()
+    # Create model
+    model = MLP()
+    model.to(p.device)
+
+    # Loss
+    loss_fn = nn.MSELoss()
     optimizer = optim.Adam(model.parameters(), lr=0.01)
     
     # Train the model
-    losses = train(model, train_loader, criterion, optimizer, device, epochs=100)
+    losses = train(model, p, train_loader, val_loader, loss_fn, optimizer, device, epochs=100)
     
     # Evaluate the model
-    test_loss = evaluate(model, test_loader, criterion, device)
+    test_loss = test(model, test_loader, device)
     
     # Save the model
     torch.save(model.state_dict(), 'mlp_model.pth')
