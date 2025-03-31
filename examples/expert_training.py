@@ -1,8 +1,7 @@
 """
 Expert pytorch training template. For extracting maximal performance and advanced DL techniques
 - Parameter class
-- Dummy data
-- MLP model
+- Dummy data - MLP model
 - automatic device
 - val/test function with @torch.no_grad decorator
 - validation printout
@@ -40,6 +39,9 @@ class Parameters():
     n_epochs = 50
     batch_size = 64
     n_grad_accumulations = 16
+    lr = 0.01
+    betas = (0.9,0.95)
+    weight_decay = 0.1
     stopping_criterion = EarlyStopping(patience=5, mode="min") 
 
     # Hardware
@@ -224,7 +226,7 @@ if __name__ == "__main__":
 
     # Loss & Optimizer & Scheduler
     loss_fn = nn.MSELoss()
-    optimizer = torch.optim.AdamW(model.parameters(), lr=0.01, betas=(0.9,0.95), eps=1e-8, weight_decay=0.1, fused=True)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=p.lr, betas=p.betas, eps=1e-8, weight_decay=p.weight_decay, fused=True)
     scheduler = ReduceLROnPlateau(optimizer, mode="min", patience=5)
     
     # Train the model

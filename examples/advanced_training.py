@@ -31,6 +31,7 @@ class Parameters():
     # Training 
     n_epochs = 50
     batch_size = 32
+    lr = 0.01
     stopping_criterion = EarlyStopping(patience=5, mode="min") 
 
     # Hardware
@@ -172,7 +173,7 @@ if __name__ == "__main__":
 
     # Loss & Optimizer & Scheduler
     loss_fn = nn.MSELoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
+    optimizer = torch.optim.Adam(model.parameters(), lr=p.lr)
     scheduler = ReduceLROnPlateau(optimizer, mode="min", patience=5)
     
     # Train the model

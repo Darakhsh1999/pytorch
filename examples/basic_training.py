@@ -18,6 +18,7 @@ class Parameters():
     # Training 
     n_epochs = 30
     batch_size = 64
+    lr = 0.01
 
     # Hardware
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -130,7 +131,7 @@ if __name__ == "__main__":
 
     # Loss
     loss_fn = nn.MSELoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
+    optimizer = torch.optim.Adam(model.parameters(), lr=p.lr)
     
     # Train the model
     train(model, p, train_loader, val_loader, loss_fn, optimizer)
