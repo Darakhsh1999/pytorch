@@ -1,6 +1,6 @@
 """
-Advanced pytorch training template with profiling enabled.
-Run: tensorboard --logdir=./profiler_logs to spin up UI server
+Advanced pytorch training template with MLFlow logging added.
+Run: "mlflow ui" to spin up UI server for watching logs
 - Parameter class
 - Dummy data
 - MLP model
@@ -12,14 +12,16 @@ Run: tensorboard --logdir=./profiler_logs to spin up UI server
 - Tqdm progress bar
 - Dataloader optimization
 - Model saving
-- PyTorch profiling
+- MLflow logging 
 """
-import os
+import os.path as osp
 import torch
+import mlflow
+import mlflow.pytorch
+import tempfile
 import torch.nn as nn
 from tqdm import tqdm
 from torch.optim import Optimizer
-from torch.profiler import profiler
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.nn.modules.loss import _Loss
 from torch.utils.data import Dataset, DataLoader
@@ -35,30 +37,10 @@ class Parameters():
     n_epochs = 50
     batch_size = 32
     lr = 0.01
-    stopping_criterion = EarlyStopping(patience=15, mode="min") 
+    stopping_criterion = EarlyStopping(patience=20, mode="min") 
 
     # Hardware
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
-    # Profiler
-    profiler_start_steps = 3 
-    profiler_end_steps = 16
-    profiler = profiler.profile(
-        activities=[
-            profiler.ProfilerActivity.CPU,
-            profiler.ProfilerActivity.CUDA if (device == 'cuda') else None
-        ],
-        schedule=profiler.schedule(
-            wait=profiler_start_steps,
-            warmup=2,
-            active=profiler_end_steps - profiler_start_steps,
-            repeat=1
-        ),
-        on_trace_ready=profiler.tensorboard_trace_handler('./profiler_logs'),
-        record_shapes=True,
-        profile_memory=True,
-        with_stack=True
-    )
 
 
 class LinearDataset(Dataset):
@@ -111,7 +93,6 @@ def train(
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     train_pbar = tqdm(range(p.n_epochs), desc=f'Training', position=0)
     
-    p.profiler.start()
     for epoch in train_pbar:
 
         # Train epoch
@@ -129,11 +110,13 @@ def train(
             loss.backward()
             train_loss += loss.item()
             optimizer.step()
-            p.profiler.step()
         train_loss = train_loss/len(train_loader)
         
         # Validation
         val_loss = test(model, p, val_loader, loss_fn)
+
+        # Log loss metrics
+        mlflow.log_metrics({"train_loss": train_loss, "val_loss": val_loss}, step=epoch)
 
         # LR scheduler
         scheduler.step(val_loss)
@@ -143,7 +126,6 @@ def train(
 
         # Check early stoppage
         if p.stopping_criterion(model, val_loss):
-            p.profiler.stop()
             p.stopping_criterion.load_best_model(model)
             train_pbar.close()
             print(f"Stopped training early at epoch {epoch+1}, best score: {p.stopping_criterion.best_score:.4f}")
@@ -151,7 +133,6 @@ def train(
     
 
     # Manually load best model at end
-    p.profiler.stop()
     p.stopping_criterion.load_best_model(model)
     return
         
@@ -183,10 +164,15 @@ if __name__ == "__main__":
 
     save_model = False
 
+    # Set experiment name
+    mlflow.set_tracking_uri(".")
+    mlflow.set_experiment("log_training tests")
+
     p = Parameters()
+    param_dict =  {k:v for (k,v) in p.__class__.__dict__.items() if (not k.startswith("__"))}
 
     # Create dataset
-    dataset = LinearDataset(num_samples=1000, noise_std=0.5)
+    dataset = LinearDataset(num_samples=50000, noise_std=0.5)
     train_data, val_data, test_data = torch.utils.data.random_split(dataset, [0.8, 0.1, 0.1])
     
     # Create dataloaders
@@ -204,12 +190,36 @@ if __name__ == "__main__":
     scheduler = ReduceLROnPlateau(optimizer, mode="min", patience=5)
     
     # Train the model
-    train(model, p, train_loader, val_loader, loss_fn, optimizer, scheduler)
+    with mlflow.start_run():
+        mlflow.set_tag("model class", model.__call__.__name__)
 
-    print(p.profiler.key_averages().table(sort_by="cpu_time_total", row_limit=10))
+        # Log parameters
+        param_dict.update({
+            "model_name": model.__class__.__name__,
+            "optimizer": optimizer.__class__.__name__,
+            "scheduler": scheduler.__class__.__name__,
+            "loss_fn": loss_fn.__class__.__name__}
+        )
+        mlflow.log_params(param_dict)
+
+        # Log artifacts of model and optimizer (alternative 1)
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            with open(osp.join(tmp_dir,"optimizer.txt"), "w") as f:
+                f.write(str(optimizer))
+            with open(osp.join(tmp_dir,"model_summary.txt"), "w") as f:
+                f.write(str(model))
+            mlflow.log_artifacts(tmp_dir, "model_optimizer")
+
+        # Log artifacts of model and optimizer (alternative 2)
+        mlflow.pytorch.log_model(model, "modelv2")
+        mlflow.pytorch.log_optimizer(optimizer, "optimizerv2")
+
+        # Start model training
+        train(model, p, train_loader, val_loader, loss_fn, optimizer, scheduler)
     
-    # Evaluate the model
-    test_loss = test(model, p, test_loader, loss_fn)
+        # Evaluate the model
+        test_loss = test(model, p, test_loader, loss_fn)
+        mlflow.log_metric("test_loss", test_loss)
 
     if save_model:
         model.to("cpu")
