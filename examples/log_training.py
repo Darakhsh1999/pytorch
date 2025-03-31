@@ -1,6 +1,6 @@
 """
 Advanced pytorch training template with MLFlow logging added.
-Run: "mlflow ui" to spin up UI server for watching logs
+Run: "mlflow ui --backend-store-uri file:./mlruns" to spin up UI server for watching logs
 - Parameter class
 - Dummy data
 - MLP model
@@ -165,8 +165,9 @@ if __name__ == "__main__":
     save_model = False
 
     # Set experiment name
-    mlflow.set_tracking_uri(".")
+    mlflow.set_tracking_uri("file:./mlruns")
     mlflow.set_experiment("log_training tests")
+    print(f"MLflow Tracking URI: {mlflow.get_tracking_uri()}")
 
     p = Parameters()
     param_dict =  {k:v for (k,v) in p.__class__.__dict__.items() if (not k.startswith("__"))}
@@ -212,7 +213,6 @@ if __name__ == "__main__":
 
         # Log artifacts of model and optimizer (alternative 2)
         mlflow.pytorch.log_model(model, "modelv2")
-        mlflow.pytorch.log_optimizer(optimizer, "optimizerv2")
 
         # Start model training
         train(model, p, train_loader, val_loader, loss_fn, optimizer, scheduler)
@@ -224,4 +224,6 @@ if __name__ == "__main__":
     if save_model:
         model.to("cpu")
         torch.save(model, "model_advanced.pt")
+
+    print(f"To view the MLflow UI, run 'mlflow ui --backend-store-uri {mlflow.get_tracking_uri()}'")
     
