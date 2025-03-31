@@ -7,6 +7,7 @@ class EarlyStopping():
         assert mode in ["max","min"], f"Invalid mode: {mode}"
 
         self.patience = patience # None patience means we never terminate early 
+        self.mode = mode
         self.sign = 1 if mode == "max" else -1
         self.min_delta = min_delta
         self.restore_best_weights = restore_best_weights
@@ -43,5 +44,8 @@ class EarlyStopping():
                     model.load_state_dict(self.best_model.state_dict())
                 return True
         return False
+    
+    def __repr__(self):
+        return f"EarlyStopping(patience={self.patience}, mode={self.mode} min_delta={self.min_delta})"
     
 
