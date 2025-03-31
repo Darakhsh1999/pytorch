@@ -1,3 +1,12 @@
+"""
+Most basic pytorch training template.
+- Parameter class
+- Dummy data
+- MLP model
+- automatic device
+- val/test function
+- validation printout
+"""
 import torch
 import torch.nn as nn
 from torch.optim import Optimizer
@@ -57,15 +66,14 @@ def train(
     train_loader: LinearDataset,
     val_loader: LinearDataset,
     loss_fn: _Loss,
-    optimizer: Optimizer
+    optimizer: Optimizer,
+    verbose: bool = True
     ):
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.train()
-    
     for epoch in range(p.n_epochs):
         for x, y in train_loader:
-            x, y = x.to(device), y.to(device)
+            x, y = x.to(p.device), y.to(p.device)
             
             # Forward pass
             outputs = model(x)
@@ -77,7 +85,7 @@ def train(
             optimizer.step()
         
         val_loss = test(model, p, val_loader, loss_fn)
-        print(f"Epoch {epoch+1} had validation loss: {val_loss:.5f}")
+        if verbose: print(f"Epoch {epoch+1} had validation loss: {val_loss:.5f}")
             
     return
         

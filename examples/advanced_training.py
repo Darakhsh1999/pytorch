@@ -1,3 +1,17 @@
+"""
+Advanced pytorch training template, works for 90% of situations.
+- Parameter class
+- Dummy data
+- MLP model
+- automatic device
+- val/test function with @torch.no_grad decorator
+- validation printout
+- Early stopping
+- LR scheduler
+- Tqdm progress bar
+- Dataloader optimization
+- Model saving
+"""
 import os
 import torch
 import torch.nn as nn
@@ -124,7 +138,7 @@ def test(
 
     model.eval()
     total_loss = 0
-    for batch_idx, (x, y) in enumerate(tqdm(train_loader, desc="[Validation]", position=1, leave=False)):
+    for _, (x, y) in enumerate(tqdm(data_loader, desc="[Validation]", position=1, leave=False)):
         x, y = x.to(p.device), y.to(p.device)
         outputs = model(x)
         loss = loss_fn(outputs, y)

@@ -1,3 +1,24 @@
+"""
+Expert pytorch training template. For extracting maximal performance and advanced DL techniques
+- Parameter class
+- Dummy data
+- MLP model
+- automatic device
+- val/test function with @torch.no_grad decorator
+- validation printout
+- Early stopping
+- LR scheduler
+- Tqdm progress bar
+- Dataloader optimization
+- Model saving
+- Model weight initialization
+- Single batch overfit (dev run)
+- Automatic Mixed Precision (AMP)
+- Gradient clipping
+- Gradient accumulation
+- Weight decey
+- torch.compile optimization
+"""
 import os
 import torch
 import torch.nn as nn
@@ -12,11 +33,6 @@ import sys
 sys.path.append("..")
 from utils.early_stoppage import EarlyStopping
 
-"""
-Add
-- MLflow logging - Claude + docs
-- torch.profiler - Claude
-"""
 
 class Parameters():
 
@@ -33,7 +49,7 @@ class Parameters():
     # AMP
     dtype = torch.bfloat16 if (torch.cuda.is_available() and torch.cuda.is_bf16_supported()) else torch.float16 # bfloat16'|'float16'
     ctx = nullcontext() if (device_name == 'cpu') else torch.autocast(device_type=device_name, dtype=dtype)
-    gradient_clipping = 0.0
+    gradient_clipping = 2.0
     scaler = torch.GradScaler(enabled=(dtype == torch.float16))
 
 
@@ -98,10 +114,10 @@ def train(
     overfit: bool = False 
     ):
 
-    train_pbar = tqdm(range(p.n_epochs), desc=f'Training', position=0)
     print(f"Started training on device: {p.device} | dtype: {p.dtype}")
     torch.set_float32_matmul_precision("high")
     
+    train_pbar = tqdm(range(p.n_epochs), desc=f'Training', position=0)
     for epoch in train_pbar:
 
         # Train epoch
@@ -168,7 +184,7 @@ def test(
 
     model.eval()
     total_loss = 0
-    for batch_idx, (x, y) in enumerate(tqdm(train_loader, desc="[Validation]", position=1, leave=False)):
+    for _, (x, y) in enumerate(tqdm(data_loader, desc="[Validation]", position=1, leave=False)):
         x, y = x.to(p.device), y.to(p.device)
         outputs = model(x)
         loss = loss_fn(outputs, y)
@@ -186,6 +202,7 @@ if __name__ == "__main__":
     compile_model = True
     save_model = False
 
+    # Hyperparameter class
     p = Parameters()
 
     # Create dataset
